@@ -16,6 +16,7 @@ volatile bool g_provisioningActive = false;
 uint32_t g_buttonDownAt = 0;
 bool g_resetTriggered = false;
 uint32_t g_lastReconnectAttempt = 0;
+bool g_timeConfigured = false;
 
 uint32_t shortChipId() {
   const uint64_t mac = ESP.getEfuseMac();
@@ -127,6 +128,12 @@ void loop() {
   maintainWiFi();
 
   if (WiFi.status() == WL_CONNECTED && !mediaServicesStarted()) {
+    if (!g_timeConfigured) {
+      // Recording still works if NTP is unavailable; it falls back to a boot
+      // identifier. Once time arrives, new segments use UTC timestamps.
+      configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+      g_timeConfigured = true;
+    }
     if (!startMediaServices(g_hostname)) {
       Serial.println("Media startup failed; restarting in five seconds");
       delay(5000);

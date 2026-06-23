@@ -23,6 +23,11 @@
 #define MIC_PIN_CLK 42
 #define MIC_PIN_DATA 41
 
+// microSD SPI bus on the Sense expansion board. CS differs by board revision
+// and is configured in config.h.
+#define SD_PIN_SCK 7
+#define SD_PIN_MISO 8
+#define SD_PIN_MOSI 9
+
 // XIAO boot button. Press only after the board has completed booting.
 #define FACTORY_RESET_BUTTON_PIN 0
-

@@ -9,8 +9,11 @@ OV3660 camera. It provides:
 - VGA JPEG live camera view on port 81
 - JPEG snapshot endpoint
 - PDM microphone level measurement
-- Three-second WAV recording endpoint
-- A phone-friendly local dashboard
+- Reliable three-second WAV downloads from a PSRAM circular buffer
+- Continuous five-minute WAV segments on microSD
+- Automatic JPEG snapshots on microSD every 30 seconds
+- Automatic support for current GPIO3 and legacy GPIO21 SD chip-select wiring
+- A responsive 90s green-phosphor terminal dashboard
 - Automatic Wi-Fi reconnect
 - BOOT-button factory reset
 
@@ -26,7 +29,8 @@ gateway or connect it to a separate TLS cloud relay.
    `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
 3. In **Boards Manager**, install **esp32 by Espressif Systems 3.3.8** or a
    later compatible 3.x release.
-4. Open `XIAO_ESP32S3_OV3660_HomeCam.ino`.
+4. Open
+   `XIAO_ESP32S3_OV3660_HomeCam/XIAO_ESP32S3_OV3660_HomeCam.ino`.
 5. Change `HOME_CAM_PROVISIONING_POP` in `config.h`. Use a private random code.
 6. Select **XIAO_ESP32S3** as the board.
 7. Select settings that enable **8 MB PSRAM** and an **8 MB flash partition
@@ -66,10 +70,35 @@ http://xiao-homecam-xxxxxx.local/
 | `http://DEVICE/` | Dashboard |
 | `http://DEVICE/capture` | Current JPEG photo |
 | `http://DEVICE/status` | Device, Wi-Fi and microphone JSON |
-| `http://DEVICE/audio.wav` | Record/download a three-second WAV clip |
+| `http://DEVICE/audio.wav` | Download the most recent three seconds as WAV |
 | `http://DEVICE:81/stream` | MJPEG live camera view |
 
 Only one live MJPEG viewer is recommended for this MVP.
+
+## Automatic microSD recording
+
+Insert a FAT32 microSD card before boot. The firmware tries SD chip select
+GPIO3 first for current OV3660 Sense boards, then GPIO21 for older boards.
+Recordings start automatically after the microphone initializes:
+
+```text
+/homecam/audio/AUD_YYYYMMDD_HHMMSS_00.WAV
+/homecam/images/IMG_YYYYMMDD_HHMMSS_00.JPG
+```
+
+Audio is written continuously as standard mono, 16 kHz, 16-bit PCM WAV files.
+Files are split every five minutes, and the active WAV header is repaired and
+flushed every five seconds so a sudden power loss sacrifices as little as
+possible. Photos are saved every 30 seconds.
+
+The recorder stops when less than 256 MB remains. It does not silently delete
+old recordings. Recording intervals and the low-space threshold are adjustable
+in `config.h`.
+
+The dashboard's audio button no longer starts a second competing I2S read.
+Instead, one capture task continuously fills a five-second PSRAM ring buffer,
+feeds the level meter and writes the SD card. The endpoint copies the latest
+three seconds from that buffer into a valid WAV file.
 
 ## Factory reset
 
@@ -90,15 +119,18 @@ sensor->set_brightness(sensor, 1);
 sensor->set_saturation(sensor, -2);
 ```
 
-## Next step for outside-home access
+## Secure outside-home access with Tailscale
 
-The safest personal setup is an always-on Raspberry Pi on the same home LAN:
+Tailscale does not run inside this Arduino firmware. Use an always-on Raspberry
+Pi or other Linux machine on the same LAN:
 
 1. The Pi reads the ESP32 dashboard/stream locally.
 2. Tailscale is installed on the Pi and phone.
-3. A small authenticated reverse proxy exposes the camera only inside the
-   private Tailscale network.
+3. The included Nginx configuration merges the dashboard on port 80 and MJPEG
+   stream on port 81 into one localhost service.
+4. Tailscale Serve publishes that localhost service over private HTTPS only to
+   your tailnet.
 
-That gateway should also terminate HTTPS, enforce login, limit sessions and
-optionally record clips. The ESP32 should never be placed directly on the
-public internet.
+Follow [gateway/README.md](gateway/README.md). Do not enable Tailscale Funnel,
+and do not port-forward the ESP32. The ESP32 should never be placed directly on
+the public internet.
