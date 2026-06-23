@@ -2,7 +2,7 @@
 
 // Change this before flashing. It is the proof-of-possession code entered by
 // the owner during Bluetooth Wi-Fi provisioning.
-#define HOME_CAM_PROVISIONING_POP "change-me-7391"
+#define HOME_CAM_PROVISIONING_POP "42069"
 
 // Conservative defaults so the OV3660, Wi-Fi and microphone can run together.
 #define HOME_CAM_FRAME_SIZE FRAMESIZE_VGA
